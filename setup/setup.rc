@@ -1,0 +1,4 @@
+#include <winuser.h>
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "setup.manifest"
+1 ICON "../res/stardust.ico"
+2 RCDATA "../gpu/third_party/fonts/BrunoAce-Regular.ttf"
