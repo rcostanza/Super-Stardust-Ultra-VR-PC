@@ -104,6 +104,14 @@ static ABI int32_t posix_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) {
     if (rem) { rem->sec=0; rem->nsec=0; }
     return 0;
 }
+/* sceKernelNanosleep: nanosleep returning SCE_KERNEL_ERROR_EINVAL for a bad request (the
+ * Interactive Streaming error dialog polls with it). */
+static ABI int32_t kernel_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) {
+    if (!rq || rq->nsec<0 || rq->nsec>=1000000000 || rq->sec<0) return ERR(22);
+    sleep_ns((uint64_t)rq->sec*1000000000+(uint64_t)rq->nsec);
+    if (rem) { rem->sec=0; rem->nsec=0; }
+    return 0;
+}
 typedef struct { int32_t minuteswest, dsttime; } GuestTimezone;
 static ABI int32_t kernel_gettimezone(GuestTimezone *tz) {
     if (!tz) return ERR(22);
@@ -347,7 +355,7 @@ static const RuntimeExport exports[]={
 
     {"sceKernelReadTsc",read_tsc}, {"sceKernelGetTscFrequency",tsc_frequency},
     {"sceKernelUsleep",kernel_usleep}, {"usleep",posix_usleep},
-    {"nanosleep",posix_nanosleep},
+    {"nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
     {"sceKernelSleep",kernel_sleep},
     {"sceKernelConvertUtcToLocaltime",kernel_utc_to_local}, {"sceKernelConvertLocaltimeToUtc",kernel_local_to_utc},
 

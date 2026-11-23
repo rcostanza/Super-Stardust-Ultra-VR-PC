@@ -498,6 +498,7 @@ clock_settime
 gettimeofday
 settimeofday
 nanosleep
+sceKernelNanosleep
 usleep
 sleep
 time

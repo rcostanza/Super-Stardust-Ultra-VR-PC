@@ -429,6 +429,7 @@
 {"kDh-NfxgMtE#libkernel","scePthreadCondSignal"},
 {"JGgj7Uvrl+A#libkernel","scePthreadCondBroadcast"},
 {"yS8U2TGCe1A#libkernel","nanosleep"},
+{"QvsZxomvUHs#libkernel","sceKernelNanosleep"},
 {"3PtV6p3QNX4#libkernel","scePthreadEqual"},
 {"14bOACANTBo#libkernel","scePthreadOnce"},
 {"geDaqgH9lTg#libkernel","scePthreadKeyCreate"},
