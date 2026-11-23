@@ -8,6 +8,7 @@ in release text as a break.
 ## v0.2
 
 - Fullscreen on ultrawide monitors now shows black bars at the sides instead of stretching the picture
+- Selecting Interactive Streaming in the Single Player menu no longer crashes the game (the mode needs PlayStation streaming, so it does nothing)
 
 ## v0.1
 
