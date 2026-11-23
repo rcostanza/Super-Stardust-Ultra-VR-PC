@@ -5,6 +5,10 @@ Each release's section becomes the text of its GitHub release (`tools/release_no
 tagging: a tag without one does not publish. Keep each entry on one line: GitHub shows a line break
 in release text as a break.
 
+## v0.2
+
+- Fullscreen on ultrawide monitors now shows black bars at the sides instead of stretching the picture
+
 ## v0.1
 
 - First release: Super Stardust Ultra VR (PS4, CUSA05951) running natively on Windows and Linux, from your own decrypted dump

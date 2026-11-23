@@ -79,7 +79,9 @@ need it skip without it.
   for SO_NBIO sockets (that bug held the game at 16 FPS).
 - No HDR: the game imports sceVideoOutGetDeviceCapabilityInfo but always opens SDR; no `hdr` setting.
 - Aspect: only 16:9 is drawn (`runtime_game_widen` returns 0), so there is no aspect setting (an old
-  `aspect_ratio` key is ignored); windows take 16:9 sizes, other screens get bars.
+  `aspect_ratio` key is ignored); windows take 16:9 sizes, other screens get bars. Exclusive
+  fullscreen never switches to a mode of another shape than the desktop's (`PickFullscreen`): a
+  16:9 mode on an ultrawide gets stretched by the monitor/GPU scaler.
 - The overlay's pages (Display Settings, exit prompt) share `gpu/shim/stardust_page.h` (the game's
   menu look: chrome gold type, orb cursor, glowing pale blue frames); type is Bruno Ace (OFL,
   `gpu/third_party/fonts`), the free face nearest the game's. Never embed the game's own fonts.

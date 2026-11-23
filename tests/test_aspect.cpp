@@ -34,14 +34,24 @@ int main() {
     assert((FitAspect(1920, 1200, Aspect16x9) == Size{1920, 1080}));
     assert((FitAspect(2560, 1440, Aspect4x3) == Size{1920, 1440}));
 
-    // Borderless keeps the desktop; exclusive takes the largest mode of the shape, else the desktop.
+    // Borderless keeps the desktop; exclusive takes the largest mode of the screen's shape and fits
+    // the picture in it: never a 16:9 mode on an ultrawide, which the scaler would stretch.
     const std::vector<Size> modes169 = {{2560, 1440}, {1920, 1080}, {1280, 720}};
     const std::vector<Size> modes219 = {{3440, 1440}, {2560, 1080}, {1920, 1080}};
+    const std::vector<Size> modes329 = {{5120, 1440}, {3840, 1080}, {2560, 1440}, {1920, 1080}};
     FullscreenChoice c = PickFullscreen(false, Aspect21x9, {2560, 1440}, modes169);
     assert((c.mode == Size{0, 0} && c.picture == Size{2560, 1098}));
     c = PickFullscreen(true, Aspect21x9, {2560, 1440}, modes169);
-    assert((c.mode == Size{0, 0} && c.picture == Size{2560, 1098}));
+    assert((c.mode == Size{2560, 1440} && c.picture == Size{2560, 1098}));
     c = PickFullscreen(true, Aspect16x9, {3440, 1440}, modes219);
+    assert((c.mode == Size{3440, 1440} && c.picture == Size{2560, 1440}));
+    c = PickFullscreen(true, Aspect16x9, {2560, 1080}, {{2560, 1080}, {1920, 1080}});
+    assert((c.mode == Size{2560, 1080} && c.picture == Size{1920, 1080}));
+    c = PickFullscreen(true, Aspect16x9, {5120, 1440}, modes329);
+    assert((c.mode == Size{5120, 1440} && c.picture == Size{2560, 1440}));
+    c = PickFullscreen(true, Aspect16x9, {2560, 1440}, modes169);
+    assert((c.mode == Size{2560, 1440} && c.picture == Size{2560, 1440}));
+    c = PickFullscreen(true, Aspect16x9, {0, 0}, modes219);
     assert((c.mode == Size{1920, 1080} && c.picture == Size{1920, 1080}));
     c = PickFullscreen(true, Aspect21x9, {3440, 1440}, modes219);
     assert((c.mode == Size{3440, 1440} && c.picture == Size{3440, 1440}));

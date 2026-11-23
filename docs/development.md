@@ -175,6 +175,9 @@ first. The game then draws everything at that size, HUD and menus included. PS4 
 Only 16:9 is drawn. A wider render device was tried: the presenter still letterboxes it and the
 menus' text stretches, so `runtime_game_widen` reports "not supported" and there is no aspect ratio
 setting: windows take 16:9 sizes and fullscreen on another shape shows the 16:9 picture with bars.
+Exclusive fullscreen keeps a display mode of the screen's own shape (`PickFullscreen`) and the
+presenter draws the bars: switching an ultrawide to a 16:9 mode let the monitor or GPU scaler stretch
+it across the panel.
 
 ### HDR
 

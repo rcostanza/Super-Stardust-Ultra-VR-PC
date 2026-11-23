@@ -90,18 +90,24 @@ inline std::pair<int, int> FitAspect(int w, int h, int ratio) {
 /// What a fullscreen mode shows for `ratio` on a screen with this desktop and these fullscreen
 /// modes: `mode` is the display mode to switch to ({0, 0}: keep the desktop's) and `picture` the
 /// game's size within it. Borderless keeps the desktop and fits the shape in it; exclusive
-/// fullscreen takes the largest mode of that shape, else the desktop's with the shape fitted.
+/// fullscreen takes the largest mode of the screen's own shape (the desktop's) and fits the picture
+/// in it with bars. A mode of another shape than the panel's would be stretched to fill it by the
+/// monitor or GPU scaler (a 16:9 mode on a 21:9 screen), so those are never picked. With no
+/// desktop size known, the largest mode of the picture's shape.
 struct FullscreenChoice {
     std::pair<int, int> mode, picture;
 };
 inline FullscreenChoice PickFullscreen(bool exclusive, int ratio, std::pair<int, int> desktop,
                                        const std::vector<std::pair<int, int>>& modes) {
     if (exclusive) {
+        const bool known = desktop.first > 0 && desktop.second > 0;
+        const std::string screen = known ? AspectLabel(desktop.first, desktop.second) : "";
         std::pair<int, int> best{0, 0};
         for (const auto& m : modes) {
-            if (AspectRatioOf(m.first, m.second) == ratio && m.first * m.second > best.first * best.second) best = m;
+            const bool shape = known ? AspectLabel(m.first, m.second) == screen : AspectRatioOf(m.first, m.second) == ratio;
+            if (shape && m.first * m.second > best.first * best.second) best = m;
         }
-        if (best.first > 0) return {best, best};
+        if (best.first > 0) return {best, FitAspect(best.first, best.second, ratio)};
     }
     return {{0, 0}, FitAspect(desktop.first, desktop.second, ratio)};
 }
