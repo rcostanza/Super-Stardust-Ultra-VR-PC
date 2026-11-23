@@ -14,8 +14,10 @@
 set -euo pipefail
 release=$(readlink -f -- "$1")
 if command -v apt-get >/dev/null; then
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3 libvulkan1 \
+    # A mirror that doesn't answer fails in a minute or two, not after apt's long default waits.
+    apt=(apt-get -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=3)
+    "${apt[@]}" update -qq
+    DEBIAN_FRONTEND=noninteractive "${apt[@]}" install -y -qq --no-install-recommends python3 libvulkan1 \
         libx11-6 libx11-xcb1 libxcb1 libxcb-render0 libxcb-shm0 libxext6 libxfixes3 libxrender1 libxi6 libxcursor1 libxrandr2 \
         libwayland-client0 libwayland-egl1 libwayland-cursor0 libxcb-shape0 libxcb-xfixes0 libasound2t64 libpulse0 libudev1 \
         libfontconfig1 libfreetype6 zlib1g libdrm2 libgbm1 libegl1 libgl1 libstdc++6 >/dev/null

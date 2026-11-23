@@ -183,6 +183,8 @@ jobs:
   linux-smoke:
     needs: linux
     runs-on: ubuntu-24.04
+    # A distro mirror that stops answering fails the job instead of holding the release for hours.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
