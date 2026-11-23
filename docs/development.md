@@ -291,6 +291,20 @@ pad keeps its slot while connected. The second pad's first connection logs in us
 disconnected until a gamepad fills the slot again. Pad handle n is user n's. Scripted input (pad file,
 record, replay) and the intro presses are player 1's only.
 
+Controller speaker: the game opens one pad speaker port (sceAudioOutOpen type 4, mono float, 256
+frames) at boot. A DualShock 4 or DualSense on USB is also a USB sound card, so `runtime_audio.c`
+(`pad_route`) plays that port on the first playback device whose name says DualSense or Wireless
+Controller (not Xbox), at the game's level, mono on the first two channels (a DualSense's third and
+fourth drive its haptics). It looks again about once a second, so a pad plugged in or pulled out
+moves the sound; otherwise it goes to the main output at -15 dB (`PAD_SPEAKER_GAIN`), as before.
+A DualSense sends those channels to its headphone jack until its output report says otherwise:
+while its port plays there, the pad host thread sends each wired DualSense
+(`SDL_SendGamepadEffect`, `speaker_path`) audio control byte 7 = 0x30 (output path 3: right channel
+to the speaker) and speaker volume 0x64, and path 0 back when the port closes and at exit
+(`runtime_pad_report`). Bluetooth pads have no audio device: main output. settings.ini
+`pad_speaker` = `controller` (default), `main` or `off` (STARDUST_PAD_SPEAKER; settings.exe and
+RecompLauncher). The log says `Runtime: pad speaker port N plays on ...`.
+
 Scripted input for automated runs: `STARDUST_PAD_FILE` (held buttons and stick values, re-read when
 the file changes), `STARDUST_PAD_RECORD` (F9 records the pad) and `STARDUST_PAD_REPLAY`.
 

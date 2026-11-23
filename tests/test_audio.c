@@ -10,6 +10,10 @@
 #include "../src/runtime_audio.c"
 
 void stardust_gpu_wait_while_paused(void) {}
+/* Pad speaker setting (stardust_gpu.cpp) and the DualSense output path (runtime_pad.c). */
+static int pad_speaker_mode = 1; /* the main output: a pad plugged into the test machine changes nothing */
+int stardust_gpu_pad_speaker(void) { return pad_speaker_mode; }
+void runtime_pad_speaker_route(int on) { (void)on; }
 /* Display Settings freezes the game (runtime_game.c): never frozen here. */
 void runtime_game_wait_frozen(void) {}
 
@@ -326,6 +330,38 @@ static void test_pad_speaker_attenuated(void) {
     printf("Pad speaker attenuation passed!\n");
 }
 
+static void test_controller_audio(void) {
+    printf("Testing controller audio devices...\n");
+    /* Windows and PipeWire / PulseAudio names of a USB DualSense and DualShock 4. */
+    assert(controller_audio_name("Speakers (DualSense Wireless Controller)") == 2);
+    assert(controller_audio_name("DualSense wireless controller (PS5) Analog Surround 4.0") == 2);
+    assert(controller_audio_name("Speakers (DualSense Edge Wireless Controller)") == 2);
+    assert(controller_audio_name("Speakers (Wireless Controller)") == 1);
+    assert(controller_audio_name("Sony Interactive Entertainment Wireless Controller Analog Stereo") == 1);
+    assert(controller_audio_name("Headset Earphone (Xbox Wireless Controller)") == 0);
+    assert(controller_audio_name("Speakers (Realtek(R) Audio)") == 0);
+    assert(controller_audio_name(NULL) == 0);
+    /* Mono to a DualSense's four channels: the first two carry it, the haptic pair stays silent. */
+    Port p = {0};
+    p.frames = 256; p.is_float = 1; p.pad_channels = 4;
+    float mono[256], out[256 * 4];
+    for (int f = 0; f < 256; ++f) mono[f] = (float)f / 512.0f;
+    pad_spread(&p, mono, out);
+    for (int f = 0; f < 256; ++f) {
+        assert(out[f * 4] == mono[f] && out[f * 4 + 1] == mono[f]);
+        assert(out[f * 4 + 2] == 0.0f && out[f * 4 + 3] == 0.0f);
+    }
+    /* pad_speaker=off: the port is open and paced, with nothing to play on. */
+    pad_speaker_mode = 2;
+    int32_t h = audio_open(0, 4, 0, 256, 48000, 3);
+    assert(h > 0 && !ports[h & 0xff].stream);
+    float buffer[256] = {0.5f};
+    assert(audio_output(h, buffer) == 256);
+    assert(audio_close(h) == 0);
+    pad_speaker_mode = 1;
+    printf("Controller audio passed!\n");
+}
+
 #ifdef _WIN32
 /* Whether WASAPI lists a playback device: the backend tests open real streams, and CI's
    Windows runners have no audio output. */
@@ -361,6 +397,7 @@ int main(void) {
     test_complete_failure_timer_sink();
     test_volume_while_feeding();
     test_pad_speaker_attenuated();
+    test_controller_audio();
 
     printf("\naudio tests ok\n");
     return 0;

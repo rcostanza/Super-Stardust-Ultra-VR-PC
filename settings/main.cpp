@@ -40,7 +40,7 @@ namespace {
 // The rows: the in-game page's first, in its order, then the start-up options.
 enum Row : int {
     RowMode, RowResolution, RowMonitor, RowVsync, RowFps, RowRender, RowSharpen,
-    RowAudio, RowSkipIntro, RowCount
+    RowAudio, RowPadSpeaker, RowSkipIntro, RowCount
 };
 
 // settings.ini's values, parsed as the game parses them (gpu/shim/stardust_settings.cpp Set).
@@ -53,6 +53,7 @@ struct Values {
     int render = S::Render1080p;
     bool sharpening = true;
     int audio = S::AudioChannelsAuto;
+    int pad_speaker = S::PadSpeakerController;
     bool skip_intro = true;
 };
 
@@ -130,6 +131,7 @@ Values Load(const fs::path& ini) {
     }
     if (std::string s = Get(ini, L"sharpening"); !s.empty()) v.sharpening = Truthy(s);
     v.audio = S::ParseAudioChannels(Get(ini, L"audio_channels"));
+    v.pad_speaker = S::ParsePadSpeaker(Get(ini, L"pad_speaker"));
     if (std::string s = Get(ini, L"skip_intro"); !s.empty()) v.skip_intro = Truthy(s);
     return v;
 }
@@ -198,6 +200,7 @@ void Save(App& app, int row) {
     case RowRender: keys = {{L"render_resolution", std::string(S::RenderResolutionKeys[v.render])}}; break;
     case RowSharpen: keys = {{L"sharpening", v.sharpening ? "1" : "0"}}; break;
     case RowAudio: keys = {{L"audio_channels", std::string(S::AudioChannelKeys[v.audio])}}; break;
+    case RowPadSpeaker: keys = {{L"pad_speaker", std::string(S::PadSpeakerKeys[v.pad_speaker])}}; break;
     case RowSkipIntro: keys = {{L"skip_intro", v.skip_intro ? "1" : "0"}}; break;
     default: return;
     }
@@ -252,6 +255,7 @@ void Change(App& app, int row, int delta) {
     case RowRender: v.render = (v.render + delta + S::RenderResolutionCount) % S::RenderResolutionCount; break;
     case RowSharpen: v.sharpening = !v.sharpening; break;
     case RowAudio: v.audio = (v.audio + delta + S::AudioChannelsCount) % S::AudioChannelsCount; break;
+    case RowPadSpeaker: v.pad_speaker = (v.pad_speaker + delta + S::PadSpeakerCount) % S::PadSpeakerCount; break;
     case RowSkipIntro: v.skip_intro = !v.skip_intro; break;
     default: return;
     }
@@ -325,6 +329,13 @@ StardustPage::Row RowAt(const App& app, int row) {
         static const char* const names[] = {"Automatic", "Stereo", "5.1", "7.1"};
         return {"Speakers", names[std::clamp(v.audio, 0, S::AudioChannelsCount - 1)],
                 "The speakers the game's sound is mixed down to. Automatic follows the playback device."};
+    }
+    case RowPadSpeaker: {
+        static const char* const names[] = {"Controller", "Main speakers", "Off"};
+        return {"Controller speaker", names[std::clamp(v.pad_speaker, 0, S::PadSpeakerCount - 1)],
+                "Where the sounds the PS4 plays on the controller's speaker go. Controller: a DualShock 4 or "
+                "DualSense plugged in by USB plays them on its own speaker; over Bluetooth, or with another "
+                "pad, they play on your speakers. Main speakers: always on your speakers. Off: not at all."};
     }
     case RowSkipIntro:
         return {"Skip intro", v.skip_intro ? "On" : "Off",

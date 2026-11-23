@@ -5,7 +5,12 @@
  * stale halves - a click every period. The lowest SDL queue level of
  * each window is steered to two buffers (silence prefill on underrun, ±3%
  * cadence corrections), which also absorbs device clock drift. Without an audio device (headless runs, STARDUST_AUDIO=none)
- * ports only follow the clock. */
+ * ports only follow the clock.
+ *
+ * The pad speaker port (type 4) plays on the controller's own speaker when a DualShock 4 or
+ * DualSense is plugged in by USB, where it is a USB sound card (pad_route); a DualSense also needs
+ * its output path set to the speaker (runtime_pad_speaker_route). Over Bluetooth, or with
+ * pad_speaker=main, it plays on the main output as before. */
 #define _GNU_SOURCE
 #include "runtime.h"
 #include "gpu/stardust_gpu.h"
@@ -29,9 +34,12 @@
 #define ERR_ALREADY_INIT ((int32_t)0x8026000E)
 #define ERR_NOT_INIT ((int32_t)0x8026000F)
 #define VOLUME_0DB 32768
-/* Pad speaker ports (type 4) play on the main output. Games master them for the DualShock 4's
-   small speaker, up to ~14 dB over the main mix; -15 dB puts them at its level; tune by ear. */
+/* Pad speaker ports (type 4) on the main output. Games master them for the DualShock 4's
+   small speaker, up to ~14 dB over the main mix; -15 dB puts them at its level; tune by ear.
+   On the controller's own speaker they play as the game sends them. */
 #define PAD_SPEAKER_GAIN 0.17783f
+enum { PAD_ON_CONTROLLER=0, PAD_ON_MAIN=1, PAD_OFF=2 }; /* stardust_gpu_pad_speaker() */
+#define ROUTE_CHECK 188 /* buffers (about 1 s at 256 frames) between two looks for the controller */
 
 typedef struct {
     int used, type, channels, is_float, frames, sample_bytes, std_layout;
@@ -42,6 +50,9 @@ typedef struct {
     int32_t volume[8];
     int32_t mix_level; /* pad speaker ports: sceAudioOutSetMixLevelPadSpk, VOLUME_0DB by default */
     SDL_AudioStream *stream;
+    /* Pad speaker ports: the controller's audio device the stream plays on (0: the main output),
+       its channel count, the setting it was chosen for, and buffers until the next look. */
+    SDL_AudioDeviceID pad_device, pad_failed; int pad_channels, pad_mode, pad_dualsense, route_countdown;
     uint64_t next_deadline_ns; /* next return of sceAudioOutOutput */
     int64_t adjust_ns; int window_min, window_count; /* queue level control */
     uint64_t last_output_us;
@@ -189,7 +200,7 @@ static void shape_buffer(const Port *p, const void *data, void *out) {
     static const int remap[8]={0,1,2,3,6,7,4,5};
     float gain[8];
     /* Pad speaker ports (type 4) are mastered for the DualShock 4's speaker: PAD_SPEAKER_GAIN. */
-    const float port_gain=p->type==4 ? PAD_SPEAKER_GAIN*(float)p->mix_level/VOLUME_0DB : 1.0f;
+    const float port_gain=p->type!=4 ? 1.0f : (p->pad_device ? 1.0f : PAD_SPEAKER_GAIN)*(float)p->mix_level/VOLUME_0DB;
     for (int c=0;c<p->channels;++c) gain[c]=(float)p->volume[c]/VOLUME_0DB*port_gain;
     const int fold=p->channels==8 && p->out_channels<8;
     const int n=fold ? p->out_channels : p->channels;
@@ -211,6 +222,75 @@ static Port *port_of(int32_t handle, int32_t *error) {
     return &ports[id];
 }
 
+#ifdef TEST_AUDIO_HOOK
+static SDL_AudioStream *(*test_open_stream)(SDL_AudioDeviceID, const SDL_AudioSpec *, SDL_AudioStreamCallback, void *) = NULL;
+#define OPEN_AUDIO_STREAM(dev, spec, cb, user) (test_open_stream ? test_open_stream(dev, spec, cb, user) : SDL_OpenAudioDeviceStream(dev, spec, cb, user))
+#else
+#define OPEN_AUDIO_STREAM(dev, spec, cb, user) SDL_OpenAudioDeviceStream(dev, spec, cb, user)
+#endif
+
+/* A playback device that is a DualShock 4 or DualSense on USB, by the names Windows (WASAPI:
+   "Speakers (DualSense Wireless Controller)", "Speakers (Wireless Controller)") and PipeWire /
+   PulseAudio ("DualSense wireless controller (PS5) ...", "Sony ... Wireless Controller ...") give
+   them. 2 for a DualSense, 1 for a DualShock 4, 0 otherwise; Xbox pads' headsets are left out. */
+static int controller_audio_name(const char *name) {
+    if (!name || SDL_strcasestr(name,"xbox")) return 0;
+    if (SDL_strcasestr(name,"dualsense")) return 2;
+    return SDL_strcasestr(name,"wireless controller") ? 1 : 0;
+}
+/* The first controller playback device (0: none), its kind (controller_audio_name) and channels. */
+static SDL_AudioDeviceID controller_audio(int *kind, int *channels) {
+    int count=0; SDL_AudioDeviceID found=0;
+    SDL_AudioDeviceID *ids=SDL_GetAudioPlaybackDevices(&count);
+    for (int i=0;ids && i<count && !found;++i) {
+        const int k=controller_audio_name(SDL_GetAudioDeviceName(ids[i]));
+        SDL_AudioSpec spec; int frames;
+        if (!k) continue;
+        found=ids[i]; *kind=k;
+        *channels=SDL_GetAudioDeviceFormat(found,&spec,&frames) && spec.channels>0 ? spec.channels : 2;
+    }
+    SDL_free(ids);
+    return found;
+}
+/* The pad speaker port's mono to the controller's channels: the first two (the DualSense plays the
+   right one on its speaker, a DualShock 4 its mix), the others silent: a DualSense's third and
+   fourth drive its haptic actuators. `out` holds frames * pad_channels samples. */
+static void pad_spread(const Port *p, const void *mono, void *out) {
+    for (size_t f=0;f<(size_t)p->frames;++f) {
+        const float v=load_sample(mono,f,p->is_float);
+        for (int c=0;c<p->pad_channels;++c) store_sample(out,f*(size_t)p->pad_channels+(size_t)c,c<2 ? v : 0.0f,p->is_float);
+    }
+}
+/* Pad speaker ports, at open and about once a second (the pad may come or go): plays on the
+   controller found (PAD_ON_CONTROLLER), else the main output; nothing with pad_speaker=off. A new
+   place gets a new stream. Called with the port locked, or before it is shared. */
+static void pad_route(Port *p, int id) {
+    const int mode=stardust_gpu_pad_speaker();
+    int kind=0, channels=0;
+    SDL_AudioDeviceID device=mode==PAD_ON_CONTROLLER ? controller_audio(&kind,&channels) : 0;
+    if (device && device==p->pad_failed) device=0; /* tried once: not every second */
+    if (p->pad_mode>=0 && device==p->pad_device && mode==p->pad_mode) return;
+    if (p->stream) SDL_DestroyAudioStream(p->stream);
+    p->stream=NULL; p->pad_device=device; p->pad_mode=mode;
+    p->pad_channels=device ? (channels>8 ? 8 : channels) : 0;
+    if (mode!=PAD_OFF) {
+        SDL_AudioSpec spec={p->is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16, device ? p->pad_channels : p->channels, 48000};
+        p->stream=OPEN_AUDIO_STREAM(device ? device : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+        if (!p->stream && device) { /* the controller would not open: the main output it is */
+            fprintf(stderr,"Runtime: controller audio failed (%s); pad speaker port %d plays on the main output\n",SDL_GetError(),id);
+            p->pad_failed=device; p->pad_device=0; p->pad_channels=0; spec.channels=p->channels;
+            p->stream=OPEN_AUDIO_STREAM(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+        }
+        if (p->stream) SDL_ResumeAudioStreamDevice(p->stream);
+    }
+    p->window_count=0; p->adjust_ns=0;
+    const int dualsense=p->stream && p->pad_device && kind==2;
+    if (dualsense!=p->pad_dualsense) runtime_pad_speaker_route(dualsense);
+    p->pad_dualsense=dualsense;
+    printf("Runtime: pad speaker port %d plays on %s\n",id,mode==PAD_OFF ? "nothing (pad_speaker=off)"
+           : p->pad_device ? SDL_GetAudioDeviceName(p->pad_device) : "the main output");
+}
+
 static ABI int32_t audio_init(void) {
     pthread_mutex_lock(&table_lock);
     int32_t r=initialized ? ERR_ALREADY_INIT : 0;
@@ -218,12 +298,6 @@ static ABI int32_t audio_init(void) {
     pthread_mutex_unlock(&table_lock);
     return r;
 }
-#ifdef TEST_AUDIO_HOOK
-static SDL_AudioStream *(*test_open_stream)(SDL_AudioDeviceID, const SDL_AudioSpec *, SDL_AudioStreamCallback, void *) = NULL;
-#define OPEN_AUDIO_STREAM(dev, spec, cb, user) (test_open_stream ? test_open_stream(dev, spec, cb, user) : SDL_OpenAudioDeviceStream(dev, spec, cb, user))
-#else
-#define OPEN_AUDIO_STREAM(dev, spec, cb, user) SDL_OpenAudioDeviceStream(dev, spec, cb, user)
-#endif
 
 /* Channels of the default playback device in the current backend; 0 when SDL cannot tell. */
 static int default_device_channels(void) {
@@ -287,10 +361,11 @@ static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_
     p->used=1; p->type=type; p->channels=channels[format]; p->is_float=format>=3 && format!=6;
     p->sample_bytes=p->is_float ? 4 : 2; p->frames=(int)length; p->std_layout=format>=6;
     for (int c=0;c<8;++c) p->volume[c]=VOLUME_0DB;
-    p->mix_level=VOLUME_0DB;
+    p->mix_level=VOLUME_0DB; p->pad_mode=-1;
     int device_channels=sdl_audio() ? default_device_channels() : 0;
     p->out_channels=p->channels==8 ? output_channels(stardust_gpu_audio_channels(),device_channels) : p->channels;
-    if (sdl_audio()) {
+    if (sdl_audio() && type==4) { pad_route(p,id); p->route_countdown=ROUTE_CHECK; }
+    else if (sdl_audio()) {
         SDL_AudioSpec spec={p->is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16, p->out_channels, 48000};
         p->stream=OPEN_AUDIO_STREAM(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
 #ifdef _WIN32
@@ -321,6 +396,8 @@ static ABI int32_t audio_close(int32_t handle) {
     if (p) {
         pthread_mutex_lock(&p->lock);
         if (p->stream) SDL_DestroyAudioStream(p->stream);
+        if (p->pad_dualsense) runtime_pad_speaker_route(0);
+        p->pad_dualsense=0;
         if (p->dump) fclose(p->dump);
         p->dump=NULL;
         p->stream=NULL; p->used=0;
@@ -349,6 +426,15 @@ static int32_t output_port(int32_t handle, const void *data, int pace, uint64_t 
         /* Port volumes, PS4 8ch to SDL 7.1 order, folded to the device's layout. */
         unsigned char converted[2048*8*4];
         shape_buffer(p,data,converted);
+        if (p->type==4 && sdl_ready>0) {
+            if (!p->route_countdown--) { p->route_countdown=ROUTE_CHECK; pad_route(p,(int)(p-ports)); }
+            if (p->pad_device && p->channels==1) {
+                unsigned char spread[2048*8*4];
+                pad_spread(p,converted,spread);
+                bytes=(size_t)p->frames*(size_t)p->pad_channels*(size_t)p->sample_bytes;
+                memcpy(converted,spread,bytes);
+            }
+        }
         /* The level lines every 3 s only with STARDUST_AUDIO_LEVELS=1: they crowded the log. */
         static int levels=-1;
         if (levels<0) { const char *e=getenv("STARDUST_AUDIO_LEVELS"); levels=e && e[0]=='1'; }
@@ -392,7 +478,9 @@ static int32_t output_port(int32_t handle, const void *data, int pace, uint64_t 
                 p->window_count=0;
             }
             p->next_deadline_ns+=(uint64_t)p->adjust_ns;
-            SDL_PutAudioStreamData(p->stream,converted,(int)bytes);
+            /* The controller has its own clock, and a port fed together with the main one is
+               paced by the main one: a buffer is dropped when the queue runs 8 ahead. */
+            if (!p->pad_device || queued<low+8*(int)bytes) SDL_PutAudioStreamData(p->stream,converted,(int)bytes);
         }
         ++buffers_out;
     }

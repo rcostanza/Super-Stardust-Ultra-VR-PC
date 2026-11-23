@@ -129,6 +129,17 @@
       "defaults": { "audio_channels": "auto" }
     },
     {
+      "id": "pad_speaker",
+      "label": "Controller speaker",
+      "help": "A DualShock 4 or DualSense plugged in by USB plays the game's controller sounds on its own speaker; otherwise they play on your speakers.",
+      "choices": [
+        { "label": "Controller", "set": { "pad_speaker": "controller" } },
+        { "label": "Main speakers", "set": { "pad_speaker": "main" } },
+        { "label": "Off", "set": { "pad_speaker": "off" } }
+      ],
+      "defaults": { "pad_speaker": "controller" }
+    },
+    {
       "id": "skip_intro",
       "label": "Intro",
       "help": "Skip goes straight to the main menu in about 10 seconds.",

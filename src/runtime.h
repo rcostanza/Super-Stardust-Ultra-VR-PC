@@ -162,6 +162,10 @@ void runtime_pad_report(void);
 /* Local users (runtime_services.c): 2 once a second gamepad has connected, as a second controller
  * logging in on the console, else 1. Player 2 stays logged in when that pad goes away. */
 int runtime_pad_users(void);
+/* runtime_audio.c: 1 while the pad speaker port plays on a DualSense's USB audio, whose sound
+ * goes to its headphone jack until told otherwise: the pad host thread then sends wired DualSense
+ * pads their speaker output path (and the normal one back at 0, and at exit). */
+void runtime_pad_speaker_route(int on);
 /* stardust --gamepad: prints one "Gamepad:" line for the first pad found (returns 1) or none (0). */
 int runtime_pad_describe(void);
 uintptr_t runtime_rtc_resolve(const char *name);

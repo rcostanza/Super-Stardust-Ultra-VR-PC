@@ -16,6 +16,9 @@ static int stub_mode=MODE_AUTO;
 int stardust_gpu_audio_channels(void) { return stub_mode; }
 /* The menu's pause (stardust_gpu.cpp): never paused here. */
 void stardust_gpu_wait_while_paused(void) {}
+/* Pad speaker setting (stardust_gpu.cpp) and the DualSense output path (runtime_pad.c). */
+int stardust_gpu_pad_speaker(void) { return 0; }
+void runtime_pad_speaker_route(int on) { (void)on; }
 /* Display Settings freezes the game (runtime_game.c): never frozen here. */
 void runtime_game_wait_frozen(void) {}
 

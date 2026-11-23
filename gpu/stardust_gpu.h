@@ -89,6 +89,9 @@ void stardust_gpu_common_dialog_initialized(void);
 /* Speaker layout for the game's 7.1 audio (settings.ini audio_channels): 0 automatic (the
  * device's), 1 stereo, 2 5.1, 3 7.1. Read when an audio port is opened. */
 int stardust_gpu_audio_channels(void);
+/* Where the pad speaker port plays (settings.ini pad_speaker): 0 the controller's speaker (a
+ * DualShock 4 or DualSense on USB; else the main output), 1 the main output, 2 nowhere. */
+int stardust_gpu_pad_speaker(void);
 /* Number of symbols registered by the vendored libraries (diagnostics). */
 unsigned stardust_gpu_symbol_count(void);
 /* Yields of threads waiting for guest memory copies (CPU report). */

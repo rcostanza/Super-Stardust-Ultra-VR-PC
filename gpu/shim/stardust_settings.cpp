@@ -74,6 +74,8 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         }
     } else if (key == "audio_channels") {
         v.audio_channels = ParseAudioChannels(value);
+    } else if (key == "pad_speaker") {
+        v.pad_speaker = ParsePadSpeaker(value);
     } else if (key == "render_resolution") {
         std::string lower;
         for (const char c : value) lower += char(std::tolower(static_cast<unsigned char>(c)));
@@ -212,7 +214,7 @@ void Load() {
         {"STARDUST_TEARING", "tearing"},
         {"STARDUST_MONITOR", "monitor"},           {"STARDUST_WINDOW", "output_resolution"},
         {"STARDUST_OUTPUT_RESOLUTION", "output_resolution"},
-        {"STARDUST_AUDIO_CHANNELS", "audio_channels"},
+        {"STARDUST_AUDIO_CHANNELS", "audio_channels"}, {"STARDUST_PAD_SPEAKER", "pad_speaker"},
         {"STARDUST_SKIP_INTRO", "skip_intro"},     {"STARDUST_FRAME_RATE", "frame_rate"},
         {"STARDUST_RENDER_RESOLUTION", "render_resolution"},
 

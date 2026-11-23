@@ -75,6 +75,11 @@ need it skip without it.
 - `skip_intro=1`: logos fast-forwarded (`runtime_game_in_intro`), D3T movie ended after its first
   frame (`runtime_pad_logo_movie`), Cross pressed for the usage terms and on the title when
   `menu.mp3` opens (`runtime_game_opened`). Boot to main menu ~10 s.
+- Pad speaker (sceAudioOut type 4, one mono port): `pad_route` (runtime_audio.c) plays it on a USB
+  DS4/DualSense audio device (name match, re-checked ~1 s), else main output at PAD_SPEAKER_GAIN;
+  a wired DualSense also gets output path 3 (speaker) via SDL_SendGamepadEffect on the pad host
+  thread (`speaker_path`, runtime_pad.c), restored on close/exit. settings.ini `pad_speaker`
+  controller/main/off. No Bluetooth audio.
 - FMOD's profiler polls accept on a non-blocking socket every frame: net_accept/recv must not sleep
   for SO_NBIO sockets (that bug held the game at 16 FPS).
 - No HDR: the game imports sceVideoOutGetDeviceCapabilityInfo but always opens SDR; no `hdr` setting.

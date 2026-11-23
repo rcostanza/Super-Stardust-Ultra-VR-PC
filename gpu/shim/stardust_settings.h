@@ -30,6 +30,18 @@ inline int ParseAudioChannels(std::string_view value) {
     if (value == "8") return Audio71;
     return AudioChannelsAuto;
 }
+/// Where the game's pad speaker sound plays (key pad_speaker, src/runtime_audio.c): the
+/// DualShock 4's or DualSense's own speaker when one is plugged in by USB (else the main output),
+/// always the main output, or nowhere.
+enum PadSpeaker : int { PadSpeakerController = 0, PadSpeakerMain, PadSpeakerOff, PadSpeakerCount };
+inline constexpr std::string_view PadSpeakerKeys[PadSpeakerCount] = {"controller", "main", "off"};
+/// A pad speaker key; anything else is the controller.
+inline int ParsePadSpeaker(std::string_view value) {
+    for (int c = 0; c < PadSpeakerCount; ++c) {
+        if (value == PadSpeakerKeys[c]) return c;
+    }
+    return PadSpeakerController;
+}
 /// Size the game renders at (key render_resolution): the PS4's 1080p, or the PS4 Pro's 2160p
 /// (PS4 Pro mode and a 3840x2160 video out, loader.c mount_boot_config_4k).
 enum RenderResolution : int { Render720p = 0, Render1080p, Render1440p, Render4k, RenderResolutionCount };
@@ -193,6 +205,8 @@ struct Values {
     std::atomic<int> frame_rate{60};
     /// Speaker layout of the game's audio (AudioChannels), read when the game opens its ports.
     std::atomic<int> audio_channels{AudioChannelsAuto};
+    /// Where the pad speaker port plays (PadSpeaker), checked about once a second.
+    std::atomic<int> pad_speaker{PadSpeakerController};
     /// RenderResolution, 1080p (the PS4's) by default; read once, before the game starts.
     int startup_render_resolution = Render1080p;
     /// What the Display Settings pages save for the next start.

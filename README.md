@@ -27,6 +27,8 @@ This requires a decrypted dump of your own copy of the game. Tested with **CUSA0
 - **settings.exe** beside the game changes the same options (and speakers, intro skip) without starting it.
 - **Keyboard and any gamepad.** DualShock 4 and DualSense work as they are, Xbox-style pads by
   button position. No mouse aiming _yet_.
+- **Controller speaker:** a DualShock 4 or DualSense plugged in by USB plays the game's controller
+  sounds on its own speaker, as on the PS4 (over Bluetooth they play on your speakers).
 - **Local co-op with two gamepads:** a second controller plays as player 2 in the Multiplayer
   modes (co-op and versus).
 - **Easy setup:** point the installer at your dumps, and it can add a desktop shortcut (on Linux, an application menu entry).
@@ -42,6 +44,7 @@ shadPS4 runs Super Stardust Ultra VR too, and this runner draws with its video c
 - **An intro skip** straight to the main menu in about 10 seconds.
 - **Cheats** (L3+R3): invulnerability, infinite lives and bombs, maxed weapons, instant boost recharge.
 - **FSR 1 sharpening**, switchable while you play.
+- **DualShock 4 / DualSense speaker sounds** on the controller itself, over USB.
 - **Display settings inside the game** (F10 or hold Select or Start) and in **settings.exe**.
 - **A self-contained install**: no emulator setup, and nothing written outside the game's folder.
 

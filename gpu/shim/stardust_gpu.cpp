@@ -412,6 +412,10 @@ extern "C" int stardust_gpu_audio_channels(void) {
     return StardustSettings::Get().audio_channels.load(std::memory_order_relaxed);
 }
 
+extern "C" int stardust_gpu_pad_speaker(void) {
+    return StardustSettings::Get().pad_speaker.load(std::memory_order_relaxed);
+}
+
 extern "C" int stardust_gpu_overlay_captures_input(void) {
     return StardustOverlay::CapturesInput() ? 1 : 0;
 }
